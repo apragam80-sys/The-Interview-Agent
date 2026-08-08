@@ -11,7 +11,19 @@ from dotenv import load_dotenv
 # Base directories
 BASE_DIR = Path(__file__).resolve().parent.parent
 PROJECT_ROOT = BASE_DIR.parent
-DATA_DIR = PROJECT_ROOT / "data"
+
+# Resolve DATA_DIR across local, docker, and railway environments
+DATA_DIR_ENV = os.getenv("DATA_DIR")
+if DATA_DIR_ENV:
+    DATA_DIR = Path(DATA_DIR_ENV)
+elif (PROJECT_ROOT / "data").exists():
+    DATA_DIR = PROJECT_ROOT / "data"
+elif Path("/data").exists():
+    DATA_DIR = Path("/data")
+else:
+    DATA_DIR = BASE_DIR / "data"
+
+DATA_DIR.mkdir(parents=True, exist_ok=True)
 
 # Load environment variables explicitly from root .env
 load_dotenv(PROJECT_ROOT / ".env")

@@ -189,6 +189,16 @@ docker-compose up --build
 
 ---
 
+### Option 3: Deploy to Railway (1-Click Container Deployment)
+
+This repository includes a production multi-stage [Dockerfile](file:///d:/Vidocothan/Dockerfile) and [railway.json](file:///d:/Vidocothan/railway.json) ready for Railway:
+
+1. Create a new project on [Railway.app](https://railway.app).
+2. Click **Deploy from GitHub repo** and select `The-Interview-Agent`.
+3. In **Variables**, add your environment variable:
+   - `GEMINI_API_KEY`: `your_gemini_api_key`
+4. Railway will automatically build the Dockerfile, compile the frontend, start the backend, and assign a live public HTTPS URL!
+
 ## 📡 API Specification
 
 ### `POST /api/interview`

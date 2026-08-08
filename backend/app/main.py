@@ -4,12 +4,16 @@ Exposes ONLY the single required public endpoint: POST /api/interview.
 """
 
 from contextlib import asynccontextmanager
+import os
+from pathlib import Path
 from fastapi import FastAPI, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
 from app.models.schemas import InterviewRequest, InterviewResponse, FeedbackData
 from app.db.database import init_db, get_session, save_session
 from app.graph.workflow import get_compiled_graph
-from app.config import logger
+from app.config import logger, PROJECT_ROOT
 
 
 @asynccontextmanager
@@ -37,19 +41,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-
-@app.get("/", tags=["Root"])
-async def root():
-    """Root endpoint providing API information and documentation link."""
-    return {
-        "service": "Adaptive AI Technical Interview Platform",
-        "version": "1.0.0",
-        "docs": "/docs",
-        "health": "/health",
-        "interview_endpoint": "POST /api/interview",
-        "frontend_dashboard": "http://localhost:5173"
-    }
 
 
 @app.get("/health", tags=["Health"])
@@ -222,3 +213,49 @@ async def interview_endpoint(payload: InterviewRequest) -> InterviewResponse:
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Interview execution error: {str(e)}"
         )
+
+
+# =====================================================================
+# Frontend SPA Static Files Integration (for unified Railway / Docker)
+# =====================================================================
+FRONTEND_DIST = os.getenv("FRONTEND_DIST", "/app/frontend_dist")
+if not os.path.exists(FRONTEND_DIST):
+    local_dist = PROJECT_ROOT / "frontend" / "dist"
+    if local_dist.exists():
+        FRONTEND_DIST = str(local_dist)
+
+if os.path.exists(FRONTEND_DIST):
+    assets_dir = os.path.join(FRONTEND_DIST, "assets")
+    if os.path.exists(assets_dir):
+        app.mount("/assets", StaticFiles(directory=assets_dir), name="assets")
+
+    @app.get("/", tags=["Frontend"])
+    async def serve_index():
+        return FileResponse(os.path.join(FRONTEND_DIST, "index.html"))
+
+    @app.get("/{full_path:path}", tags=["Frontend"])
+    async def serve_spa(full_path: str):
+        if (
+            full_path.startswith("api/")
+            or full_path == "api"
+            or full_path.startswith("docs")
+            or full_path.startswith("openapi.json")
+            or full_path.startswith("health")
+        ):
+            raise HTTPException(status_code=404, detail="Not Found")
+        file_path = os.path.join(FRONTEND_DIST, full_path)
+        if full_path and os.path.exists(file_path) and os.path.isfile(file_path):
+            return FileResponse(file_path)
+        return FileResponse(os.path.join(FRONTEND_DIST, "index.html"))
+else:
+    @app.get("/", tags=["Root"])
+    async def root():
+        """Root endpoint providing API information when frontend is not mounted."""
+        return {
+            "service": "Adaptive AI Technical Interview Platform",
+            "version": "1.0.0",
+            "docs": "/docs",
+            "health": "/health",
+            "interview_endpoint": "POST /api/interview",
+            "frontend_dashboard": "http://localhost:5173"
+        }
